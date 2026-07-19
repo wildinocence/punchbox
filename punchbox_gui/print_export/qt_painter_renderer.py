@@ -37,7 +37,7 @@ class QPainterRenderer(Renderer):
         self.painter.setPen(pen)
         self.painter.drawLine(QLineF(x1, y1, x2, y2))
 
-    def circle(self, x, y, radius, color):
+    def circle(self, x, y, radius, color, note_id=None):
         self.painter.setPen(QPen(QColor(color)))
         self.painter.setBrush(QBrush(QColor(color)))
         self.painter.drawEllipse(QRectF(x - radius, y - radius, radius * 2, radius * 2))

@@ -27,6 +27,72 @@ class Diagnostics:
     warnings: List[str] = field(default_factory=list)
 
 
+@dataclass
+class StaveGeometry:
+    staves_per_page: int
+    stave_width: float
+    max_stave_length: float
+    pages: int
+
+
+def compute_stave_geometry(tune, music_box, params):
+    """The pure pagination math shared by draw_layout() and the GUI's inverse
+    scene-position-to-note mapping (scene_point_to_note) - kept as a single
+    implementation so the two can never drift apart.
+
+    A tune with no notes still gets at least one page/stave, so an empty,
+    freshly-created tune has somewhere for the piano-roll editor to click.
+    """
+    max_time_qlen = max((n.start for n in tune.notes), default=0.0)
+    max_length = max_time_qlen * params.mm_per_quarter
+
+    stave_width = (len(music_box.note_data) - 1) * music_box.pitch + params.margin
+    staves_per_page = int(math.floor((params.page_height - params.margin) / stave_width))
+    max_stave_length = params.page_width - (params.margin * 2)
+    no_staves_required = int(math.ceil(max_length / max_stave_length))
+    pages = max(int(math.ceil(no_staves_required / staves_per_page)), 1)
+
+    return StaveGeometry(
+        staves_per_page=staves_per_page,
+        stave_width=stave_width,
+        max_stave_length=max_stave_length,
+        pages=pages,
+    )
+
+
+def scene_point_to_note(page_index, x_in_page, y_in_page, music_box, params, geometry):
+    """Invert draw_layout's geometry: given a click at (x_in_page, y_in_page) mm
+    within page `page_index`, return (pitch, start_qlen) for the note lane/time
+    under that point, or None if the click missed every lane/stave/time range.
+
+    `pitch` is the music box's own note_data value at that lane - the caller is
+    responsible for subtracting the current transpose shift to get a raw
+    NoteEvent.pitch, mirroring how draw_layout adds it before calling
+    nearest_lane() in the forward direction.
+    """
+    if geometry.staves_per_page <= 0:
+        return None
+
+    stave = int((y_in_page - params.margin) // geometry.stave_width)
+    if stave < 0 or stave >= geometry.staves_per_page:
+        return None
+
+    line_offset = (stave * geometry.stave_width) + params.margin
+    lane = round((y_in_page - line_offset) / music_box.pitch)
+    if lane < 0 or lane >= len(music_box.note_data):
+        return None
+
+    note_time = x_in_page - params.margin
+    if note_time < 0 or note_time > geometry.max_stave_length:
+        return None
+
+    stave_index = (page_index * geometry.staves_per_page) + stave
+    offset_time = stave_index * geometry.max_stave_length
+    start_qlen = (note_time + offset_time) / params.mm_per_quarter
+
+    return music_box.note_data[lane], start_qlen
+
+
 def nearest_lane(music_box, pitch):
     """Return (lane_index, exact) for `pitch` on `music_box`.
 
@@ -98,14 +164,11 @@ def draw_layout(tune, music_box, params, transpose, renderer, name=None):
             )
         )
 
-    max_time_qlen = max((n.start for n in notes), default=0.0)
-    max_length = max_time_qlen * params.mm_per_quarter
-
-    stave_width = (len(music_box.note_data) - 1) * music_box.pitch + params.margin
-    staves_per_page = int(math.floor((params.page_height - params.margin) / stave_width))
-    max_stave_length = params.page_width - (params.margin * 2)
-    no_staves_required = int(math.ceil(max_length / max_stave_length))
-    pages = int(math.ceil(no_staves_required / staves_per_page))
+    geometry = compute_stave_geometry(tune, music_box, params)
+    staves_per_page = geometry.staves_per_page
+    stave_width = geometry.stave_width
+    max_stave_length = geometry.max_stave_length
+    pages = geometry.pages
 
     offset = 0
     for page in range(pages):
@@ -166,6 +229,7 @@ def draw_layout(tune, music_box, params, transpose, renderer, name=None):
                     (lane * music_box.pitch) + line_offset,
                     1.0,
                     "black" if exact else "red",
+                    note_id=note.id,
                 )
         renderer.save()
 

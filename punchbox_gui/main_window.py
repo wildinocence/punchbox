@@ -26,7 +26,9 @@ class MainWindow(QMainWindow):
         self.state = AppState(load_boxen_config(boxen_config_path))
 
         self.piano_roll = PianoRollView()
-        self.diagnostics_label = QLabel("Open a MIDI file to begin.")
+        self.diagnostics_label = QLabel(
+            "Open a MIDI file, or click a lane on the right to start composing."
+        )
         self.diagnostics_label.setWordWrap(True)
 
         self.box_combo = QComboBox()
@@ -39,6 +41,16 @@ class MainWindow(QMainWindow):
         self.mm_per_quarter_spin.valueChanged.connect(self._on_mm_per_quarter_changed)
 
         self.setCentralWidget(self._build_central_widget())
+
+        # Any state change re-renders the preview - editing, loading a file, or
+        # tweaking a layout field all funnel through the same refresh.
+        self.state.tuneChanged.connect(self._refresh_preview)
+        self.state.musicBoxChanged.connect(self._refresh_preview)
+        self.state.layoutParamsChanged.connect(self._refresh_preview)
+
+        self.piano_roll.noteAddRequested.connect(self.state.add_note)
+        self.piano_roll.noteMoveRequested.connect(self.state.move_note)
+        self.piano_roll.notesDeleteRequested.connect(self.state.delete_notes)
 
         if self.state.boxen_names:
             self.box_combo.setCurrentText(self.state.boxen_names[0])
@@ -90,11 +102,9 @@ class MainWindow(QMainWindow):
         if not name:
             return
         self.state.set_music_box(name)
-        self._refresh_preview()
 
     def _on_mm_per_quarter_changed(self, value):
         self.state.set_layout_params(mm_per_quarter=value)
-        self._refresh_preview()
 
     def _open_midi(self):
         path, _ = QFileDialog.getOpenFileName(
@@ -103,7 +113,6 @@ class MainWindow(QMainWindow):
         if not path:
             return
         self.state.set_tune(load_tune_from_midi(path))
-        self._refresh_preview()
 
     def _refresh_preview(self):
         if self.state.music_box is None:

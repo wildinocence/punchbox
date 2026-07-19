@@ -30,7 +30,7 @@ class SvgRenderer:
             )
         )
 
-    def circle(self, x, y, radius, color):
+    def circle(self, x, y, radius, color, note_id=None):
         self._dwg.add(self._dwg.circle((_mm(x), _mm(y)), _mm(radius), fill=color))
 
     def text(self, content, x, y, color, font_size):

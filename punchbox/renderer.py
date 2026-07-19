@@ -19,7 +19,11 @@ class Renderer(ABC):
         ...
 
     @abstractmethod
-    def circle(self, x, y, radius, color):
+    def circle(self, x, y, radius, color, note_id=None):
+        """Draw a note dot. `note_id` (NoteEvent.id) is only meaningful to
+        interactive renderers (e.g. the GUI's editable piano-roll) that need to
+        map a drawn dot back to the note it represents; other backends ignore it.
+        """
         ...
 
     @abstractmethod
