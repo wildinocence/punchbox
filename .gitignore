@@ -2,3 +2,7 @@
 *.mid
 *.pyc
 *.rg
+__pycache__/
+*.egg-info/
+.eggs/
+.pytest_cache/

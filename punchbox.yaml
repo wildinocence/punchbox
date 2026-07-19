@@ -1,9 +1,12 @@
 boxen:
-  35note:
+  30note:
+    # Confirmed against a real 30-note music box paper-strip template (low -> high).
     note_data: [60, 62, 67, 69, 71, 72, 74, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 98, 100]
     pitch: 2.0
     reverse: True
     note_collision: 5.0
+# mm of strip per quarter-length beat. Was MIDI-ticks-per-mm before the source model
+# switched to quarter-lengths - this value needs a fresh visual re-tune, not reuse.
 divisor: 49.5 #67.0
 #filename: FF7AC-TifasTheme_short2.mid
 filename: mooshoo.mid
@@ -18,4 +21,4 @@ output: mooshoo
 font_size: 1.0
 marker_offset: 6
 marker_size: 5
-default_musicbox: 35note
+default_musicbox: 30note

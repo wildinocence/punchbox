@@ -6,7 +6,8 @@ setup(
     setup_requires=["pbr"],
     pbr=True,
     name="punchbox",
-    entry_points={"console_scripts": ["punchbox = punchbox:main"]},
+    entry_points={"console_scripts": ["punchbox = punchbox.cli:main"]},
     packages=find_packages(),
-    install_requires=["pre-commit", "click", "mido", "pbr", "PyYAML", "svgwrite"],
+    python_requires=">=3.9",
+    install_requires=["click", "mido", "pbr", "PyYAML", "svgwrite"],
 )
