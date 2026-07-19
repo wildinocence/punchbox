@@ -15,5 +15,5 @@ setup(
     packages=find_packages(),
     python_requires=">=3.9",
     install_requires=["click", "mido", "pbr", "PyYAML", "svgwrite"],
-    extras_require={"gui": ["PySide6"]},
+    extras_require={"gui": ["PySide6", "numpy", "sounddevice"]},
 )

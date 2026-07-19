@@ -5,6 +5,10 @@ boxen:
     pitch: 2.0
     reverse: True
     note_collision: 5.0
+    # Unmeasured placeholder (mm/s the physical strip feeds through the box) -
+    # time this on the real box and correct it; the GUI's playback-speed slider
+    # is a stopgap until then.
+    feed_rate_mm_per_s: 15.0
 # mm of strip per quarter-length beat. Was MIDI-ticks-per-mm before the source model
 # switched to quarter-lengths - this value needs a fresh visual re-tune, not reuse.
 divisor: 49.5 #67.0

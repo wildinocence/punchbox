@@ -16,6 +16,7 @@ def test_music_box_defaults():
     assert box.pitch == 2.0
     assert box.note_collision == 5.0
     assert box.reverse is False
+    assert box.feed_rate_mm_per_s == 15.0
 
 
 def test_punchbox_yaml_has_30note_box_matching_physical_template():

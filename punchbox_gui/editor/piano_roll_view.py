@@ -1,12 +1,15 @@
 from PySide6.QtCore import Qt
 from PySide6.QtCore import Signal
+from PySide6.QtGui import QColor
 from PySide6.QtGui import QPainter
+from PySide6.QtGui import QPen
 from PySide6.QtWidgets import QGraphicsScene
 from PySide6.QtWidgets import QGraphicsView
 
 from punchbox.layout import compute_stave_geometry
 from punchbox.layout import draw_layout
 from punchbox.layout import scene_point_to_note
+from punchbox.layout import stave_position_for_time_mm
 
 from .note_item import NoteItem
 from .scene_renderer import SceneRenderer
@@ -42,12 +45,14 @@ class PianoRollView(QGraphicsView):
         self._transpose = None
         self._geometry = None
         self._page_offsets = []
+        self._playhead_item = None
 
     def display_layout(self, tune, music_box, params, transpose, name=None):
         scene = QGraphicsScene(self)
         renderer = SceneRenderer(scene, on_note_released=self._handle_note_released)
         diagnostics = draw_layout(tune, music_box, params, transpose, renderer, name=name)
         self.setScene(scene)
+        self._playhead_item = None  # belonged to the discarded scene
 
         self._music_box = music_box
         self._params = params
@@ -55,6 +60,39 @@ class PianoRollView(QGraphicsView):
         self._geometry = compute_stave_geometry(tune, music_box, params)
         self._page_offsets = renderer.page_offsets
         return diagnostics
+
+    def set_playhead_time_mm(self, time_mm):
+        """Move the playhead marker to the stave position corresponding to
+        `time_mm` along the strip - called on a timer during audio playback so
+        the marker tracks what's currently sounding.
+        """
+        if self._geometry is None or not self._page_offsets or self._params is None:
+            return
+
+        page_index, stave, x_in_page = stave_position_for_time_mm(
+            time_mm, self._params, self._geometry
+        )
+        if page_index >= len(self._page_offsets):
+            self.clear_playhead()
+            return
+
+        line_offset = (stave * self._geometry.stave_width) + self._params.margin
+        y_top = line_offset - self._params.margin
+        y_bottom = line_offset + self._geometry.stave_width - self._params.margin
+        page_y = self._page_offsets[page_index]
+
+        if self._playhead_item is None:
+            pen = QPen(QColor("green"))
+            pen.setWidthF(0.3)
+            self._playhead_item = self.scene().addLine(0, 0, 0, 0, pen)
+            self._playhead_item.setZValue(2.0)
+        self._playhead_item.setLine(x_in_page, y_top + page_y, x_in_page, y_bottom + page_y)
+
+    def clear_playhead(self):
+        if self._playhead_item is not None:
+            if self.scene() is not None:
+                self.scene().removeItem(self._playhead_item)
+            self._playhead_item = None
 
     def mousePressEvent(self, event):
         if event.button() == Qt.MouseButton.LeftButton:

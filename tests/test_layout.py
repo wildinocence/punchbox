@@ -1,9 +1,12 @@
+import pytest
+
 from punchbox.config import MusicBox
 from punchbox.layout import LayoutParams
 from punchbox.layout import compute_stave_geometry
 from punchbox.layout import draw_layout
 from punchbox.layout import nearest_lane
 from punchbox.layout import scene_point_to_note
+from punchbox.layout import stave_position_for_time_mm
 from punchbox.model import NoteEvent
 from punchbox.model import Tune
 from punchbox.transpose import TransposeResult
@@ -169,3 +172,34 @@ def test_scene_point_to_note_rejects_clicks_outside_any_lane_or_stave():
     assert scene_point_to_note(0, -1.0, 5.0, box, params, geometry) is None  # left of margin
     assert scene_point_to_note(0, 5.0, 0.5, box, params, geometry) is None  # above top lane
     assert scene_point_to_note(0, 5.0, 999.0, box, params, geometry) is None  # off the page
+
+
+def test_stave_position_for_time_mm_matches_draw_layout_dot_x():
+    # Same fixture as the scene_point_to_note round-trip test: note_b's dot
+    # (start=1.0 qlen, mm_per_quarter=10.0) lands at x=15.0 on stave 0, page 0.
+    box = _box([60, 62, 64], pitch=2.0)
+    tune = Tune(title="t", notes=[NoteEvent(pitch=60, start=0)])
+    params = LayoutParams(mm_per_quarter=10.0, margin=5.0, page_width=50.0, page_height=50.0)
+    geometry = compute_stave_geometry(tune, box, params)
+
+    page_index, stave, x_in_page = stave_position_for_time_mm(10.0, params, geometry)
+
+    assert (page_index, stave, x_in_page) == (0, 0, 15.0)
+
+
+def test_stave_position_for_time_mm_wraps_to_next_stave_and_page():
+    box = _box([60, 62], pitch=2.0)
+    tune = Tune(title="t", notes=[NoteEvent(pitch=60, start=0)])
+    params = LayoutParams(mm_per_quarter=10.0, margin=2.0, page_width=30.0, page_height=10.0)
+    geometry = compute_stave_geometry(tune, box, params)
+    assert geometry.staves_per_page == 2  # sanity check on the fixture
+
+    # max_stave_length = 30 - 2*2 = 26mm; a time just past that wraps to stave 1.
+    page_index, stave, x_in_page = stave_position_for_time_mm(27.0, params, geometry)
+    assert (page_index, stave) == (0, 1)
+    assert x_in_page == pytest.approx(1.0 + params.margin)
+
+    # far enough along to wrap past staves_per_page onto the next page.
+    time_past_one_page = geometry.max_stave_length * geometry.staves_per_page + 1.0
+    page_index, stave, _ = stave_position_for_time_mm(time_past_one_page, params, geometry)
+    assert (page_index, stave) == (1, 0)

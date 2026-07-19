@@ -93,6 +93,20 @@ def scene_point_to_note(page_index, x_in_page, y_in_page, music_box, params, geo
     return music_box.note_data[lane], start_qlen
 
 
+def stave_position_for_time_mm(time_mm, params, geometry):
+    """Inverse of the per-stave time offset draw_layout uses internally: given
+    an absolute time in mm along the strip, return (page_index, stave,
+    x_in_page) - the same page/stave-row/x a note at that time would be drawn
+    on. Used to place a playhead in sync with audio playback, which tracks
+    time directly rather than any single note's position.
+    """
+    stave_index = int(time_mm // geometry.max_stave_length)
+    stave = stave_index % geometry.staves_per_page
+    page_index = stave_index // geometry.staves_per_page
+    x_in_page = (time_mm - (stave_index * geometry.max_stave_length)) + params.margin
+    return page_index, stave, x_in_page
+
+
 def nearest_lane(music_box, pitch):
     """Return (lane_index, exact) for `pitch` on `music_box`.
 
