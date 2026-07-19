@@ -6,6 +6,7 @@ from .layout import LayoutParams
 from .layout import draw_layout
 from .midi_source import load_tune_from_midi
 from .render_svg import SvgRenderer
+from .renderer import RotatedRenderer
 from .transpose import find_best_transpose
 
 with open("punchbox.yaml") as f:
@@ -69,8 +70,10 @@ def main(
         font_size=float(font_size),
     )
 
+    # Physical strips are narrow-and-long (e.g. 90mm x 700mm), the opposite of
+    # draw_layout's own landscape (x=time, y=lane) axes - rotate on the way out.
     diagnostics = draw_layout(
-        tune, music_box, params, transpose, SvgRenderer(output), name=display_name
+        tune, music_box, params, transpose, RotatedRenderer(SvgRenderer(output)), name=display_name
     )
 
     click.echo("TRANSPOSE: {}".format(transpose.shift))

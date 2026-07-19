@@ -31,7 +31,8 @@ def test_render_to_printer_produces_a_pdf(tmp_path, qapp):
     params = LayoutParams(mm_per_quarter=10.0, margin=5.0, page_width=50.0, page_height=50.0)
     transpose = TransposeResult(shift=0, fit_fraction=1.0)
 
-    printer = _pdf_printer(tmp_path, params.page_width, params.page_height)
+    # Physical page is (page_height, page_width) - see render_to_printer's rotation.
+    printer = _pdf_printer(tmp_path, params.page_height, params.page_width)
     diagnostics = print_controller.render_to_printer(
         printer, tune, box, params, transpose, name="t"
     )
@@ -58,11 +59,28 @@ def test_render_to_printer_handles_multiple_pages(tmp_path, qapp):
     params = LayoutParams(mm_per_quarter=10.0, margin=2.0, page_width=30.0, page_height=10.0)
     transpose = TransposeResult(shift=0, fit_fraction=1.0)
 
-    printer = _pdf_printer(tmp_path, params.page_width, params.page_height)
+    printer = _pdf_printer(tmp_path, params.page_height, params.page_width)
     # Should not raise despite requiring printer.newPage() to be called internally.
     print_controller.render_to_printer(printer, tune, box, params, transpose, name="t")
 
     assert (tmp_path / "out.pdf").stat().st_size > 0
+
+
+def test_render_to_printer_rotates_to_match_a_narrow_long_strip(tmp_path, qapp):
+    # Mirrors the real 30-note box's shape (narrow across notes, long along
+    # time) at a small scale: a 20mm-wide, 60mm-long physical strip.
+    box = MusicBox({"note_data": [60, 62, 64], "pitch": 2.0, "note_collision": 1.0})
+    tune = Tune(title="t", notes=[NoteEvent(pitch=60, start=0)])
+    params = LayoutParams(mm_per_quarter=10.0, margin=5.0, page_width=60.0, page_height=20.0)
+    transpose = TransposeResult(shift=0, fit_fraction=1.0)
+
+    printer = _pdf_printer(tmp_path, params.page_height, params.page_width)
+    print_controller.render_to_printer(printer, tune, box, params, transpose, name="t")
+
+    page = fitz.open(str(tmp_path / "out.pdf"))[0]
+    pt_per_mm = 2.8346
+    assert page.rect.width == pytest.approx(params.page_height * pt_per_mm, abs=1.0)
+    assert page.rect.height == pytest.approx(params.page_width * pt_per_mm, abs=1.0)
 
 
 def test_render_calibration_ruler_produces_a_pdf(tmp_path, qapp):

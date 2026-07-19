@@ -11,6 +11,7 @@ from PySide6.QtPrintSupport import QPrinter
 from PySide6.QtPrintSupport import QPrintPreviewDialog
 
 from punchbox.layout import draw_layout
+from punchbox.renderer import RotatedRenderer
 
 from .qt_painter_renderer import PT_PER_MM
 from .qt_painter_renderer import QPainterRenderer
@@ -27,8 +28,13 @@ def _mm_font(mm_height, dots_per_mm):
 
 
 def _configure_printer(printer, params):
+    # Physical page is params (height, width), not (width, height): draw_layout's
+    # own axes are landscape (x=time spans page_width, y=lane spans page_height),
+    # but render_to_printer rotates that 90 degrees via RotatedRenderer to match a
+    # real strip - narrow across the notes, long along time - so the physical
+    # page handed to the printer driver must already be sized to match.
     printer.setPageSize(
-        QPageSize(QSizeF(params.page_width, params.page_height), QPageSize.Millimeter)
+        QPageSize(QSizeF(params.page_height, params.page_width), QPageSize.Millimeter)
     )
     printer.setFullPage(True)
     printer.setResolution(300)
@@ -43,7 +49,7 @@ def render_to_printer(printer, tune, music_box, params, transpose, name=None):
     painter = QPainter(printer)
     dots_per_mm = printer.resolution() / 25.4
     painter.scale(dots_per_mm, dots_per_mm)
-    renderer = QPainterRenderer(painter, dots_per_mm, on_new_page=printer.newPage)
+    renderer = RotatedRenderer(QPainterRenderer(painter, dots_per_mm, on_new_page=printer.newPage))
     diagnostics = draw_layout(tune, music_box, params, transpose, renderer, name=name)
     painter.end()
     return diagnostics

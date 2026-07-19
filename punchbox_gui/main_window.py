@@ -13,6 +13,7 @@ from punchbox.config import load_boxen_config
 from punchbox.layout import draw_layout
 from punchbox.midi_source import load_tune_from_midi
 from punchbox.render_svg import SvgRenderer
+from punchbox.renderer import RotatedRenderer
 
 from .editor.piano_roll_view import PianoRollView
 from .print_export import print_controller
@@ -149,7 +150,7 @@ class MainWindow(QMainWindow):
             self.state.music_box,
             self.state.layout_params,
             transpose,
-            SvgRenderer(prefix),
+            RotatedRenderer(SvgRenderer(prefix)),
             name=self.state.tune.title,
         )
 

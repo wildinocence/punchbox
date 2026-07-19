@@ -13,12 +13,17 @@ filename: mooshoo.mid
 transpose:
     lower: -100
     upper: 100
+# Real physical strip is 90mm wide x ~700mm long (one continuous run, not A4
+# sheets to cut & tape) - width/height here are draw_layout's internal (time
+# budget, lane budget) axes, which print/SVG output then rotates 90 degrees
+# via RotatedRenderer to match the strip's actual narrow-and-long shape. See
+# punchbox_gui/print_export/print_controller.py.
 page:
-    width: 297.0
-    height: 210.0
-margin: 20.0
+    width: 700.0
+    height: 90.0
+margin: 10.0
 output: mooshoo
 font_size: 1.0
-marker_offset: 6
-marker_size: 5
+marker_offset: 4
+marker_size: 3
 default_musicbox: 30note
