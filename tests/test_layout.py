@@ -203,3 +203,38 @@ def test_stave_position_for_time_mm_wraps_to_next_stave_and_page():
     time_past_one_page = geometry.max_stave_length * geometry.staves_per_page + 1.0
     page_index, stave, _ = stave_position_for_time_mm(time_past_one_page, params, geometry)
     assert (page_index, stave) == (1, 0)
+
+
+def test_draw_layout_renders_lyric_text_when_present():
+    box = _box([60, 62, 64], pitch=2.0)
+    note = NoteEvent(pitch=60, start=0, lyric="Je")
+    tune = Tune(title="t", notes=[note])
+    params = LayoutParams(mm_per_quarter=10.0, margin=5.0, page_width=50.0, page_height=50.0)
+    transpose = TransposeResult(shift=0, fit_fraction=1.0)
+    renderer = FakeRenderer()
+
+    draw_layout(tune, box, params, transpose, renderer, name="t")
+
+    lyric_calls = [c for c in renderer.calls if c[0] == "text" and c[1] == "Je"]
+    assert len(lyric_calls) == 1
+
+
+def test_draw_layout_never_places_a_lyric_at_a_lane_y_position():
+    # The whole point of the offset: a punch happens at exactly the lane's y,
+    # so lyric text must never land on one of those y values, for any lane.
+    box = _box([60, 62, 64], pitch=2.0)
+    notes = [
+        NoteEvent(pitch=60, start=0, lyric="A"),
+        NoteEvent(pitch=62, start=1, lyric="men"),
+        NoteEvent(pitch=64, start=2, lyric="!"),
+    ]
+    tune = Tune(title="t", notes=notes)
+    params = LayoutParams(mm_per_quarter=10.0, margin=5.0, page_width=50.0, page_height=50.0)
+    transpose = TransposeResult(shift=0, fit_fraction=1.0)
+    renderer = FakeRenderer()
+
+    draw_layout(tune, box, params, transpose, renderer, name="t")
+
+    lane_ys = {(i * box.pitch) + params.margin for i in range(len(box.note_data))}
+    lyric_ys = {c[3] for c in renderer.calls if c[0] == "text" and c[1] in ("A", "men", "!")}
+    assert lyric_ys and lyric_ys.isdisjoint(lane_ys)

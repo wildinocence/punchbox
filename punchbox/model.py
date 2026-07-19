@@ -19,6 +19,7 @@ class NoteEvent:
     start: float  # quarter-lengths (beats) from the start of the tune
     duration: float = 0.25  # quarter-lengths; informational, not used for punch-strip layout
     source: str = "unknown"  # "midi" | "omr" | "manual"
+    lyric: Optional[str] = None  # syllable for this note, populated by OMR
     id: int = field(default_factory=_next_note_id)
 
 

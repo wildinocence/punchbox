@@ -245,6 +245,17 @@ def draw_layout(tune, music_box, params, transpose, renderer, name=None):
                     "black" if exact else "red",
                     note_id=note.id,
                 )
+                if note.lyric:
+                    # Above the topmost lane (y < every lane's y = line_offset +
+                    # lane*pitch for lane >= 0), so the syllable can never land on
+                    # a punched hole - see the Phase 5 lyric-placement requirement.
+                    renderer.text(
+                        note.lyric,
+                        note_time + params.margin,
+                        line_offset - params.font_size,
+                        "black",
+                        params.font_size,
+                    )
         renderer.save()
 
     if transpose.fit_fraction != 1.0:

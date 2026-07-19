@@ -1,3 +1,6 @@
 PySide6
 numpy
 sounddevice
+PyMuPDF
+music21
+oemer

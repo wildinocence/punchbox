@@ -1,12 +1,17 @@
+import os
+
+from PySide6.QtCore import Qt
 from PySide6.QtCore import QTimer
 from PySide6.QtWidgets import QComboBox
 from PySide6.QtWidgets import QDoubleSpinBox
 from PySide6.QtWidgets import QFileDialog
 from PySide6.QtWidgets import QFormLayout
 from PySide6.QtWidgets import QHBoxLayout
+from PySide6.QtWidgets import QInputDialog
 from PySide6.QtWidgets import QLabel
 from PySide6.QtWidgets import QMainWindow
 from PySide6.QtWidgets import QMessageBox
+from PySide6.QtWidgets import QProgressDialog
 from PySide6.QtWidgets import QPushButton
 from PySide6.QtWidgets import QVBoxLayout
 from PySide6.QtWidgets import QWidget
@@ -19,6 +24,9 @@ from punchbox.renderer import RotatedRenderer
 
 from .audio.engine import AudioEngine
 from .editor.piano_roll_view import PianoRollView
+from .omr.musicxml_to_tune import build_tune_from_pages
+from .omr.musicxml_to_tune import part_names
+from .omr.omr_worker import run_omr_in_background
 from .print_export import print_controller
 from .state import AppState
 
@@ -41,6 +49,11 @@ class MainWindow(QMainWindow):
         self._playhead_timer = QTimer(self)
         self._playhead_timer.setInterval(_PLAYHEAD_INTERVAL_MS)
         self._playhead_timer.timeout.connect(self._update_playhead)
+
+        self._omr_thread = None
+        self._omr_worker = None
+        self._omr_progress = None
+        self._omr_pdf_path = None
 
         self.box_combo = QComboBox()
         self.box_combo.addItems(self.state.boxen_names)
@@ -78,6 +91,9 @@ class MainWindow(QMainWindow):
         open_button = QPushButton("Open MIDI…")
         open_button.clicked.connect(self._open_midi)
 
+        open_pdf_button = QPushButton("Open PDF (OMR)…")
+        open_pdf_button.clicked.connect(self._open_pdf)
+
         export_button = QPushButton("Export SVG…")
         export_button.clicked.connect(self._export_svg)
 
@@ -109,6 +125,7 @@ class MainWindow(QMainWindow):
 
         controls = QVBoxLayout()
         controls.addWidget(open_button)
+        controls.addWidget(open_pdf_button)
         controls.addLayout(form)
         controls.addLayout(transport)
         controls.addWidget(export_button)
@@ -151,6 +168,73 @@ class MainWindow(QMainWindow):
         if not path:
             return
         self.state.set_tune(load_tune_from_midi(path))
+
+    def _open_pdf(self):
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Open sheet music PDF", "", "PDF files (*.pdf)"
+        )
+        if not path:
+            return
+        self._omr_pdf_path = path
+
+        self._omr_progress = QProgressDialog("Starting OMR…", "Cancel", 0, 1, self)
+        self._omr_progress.setWindowModality(Qt.WindowModality.WindowModal)
+        self._omr_progress.setMinimumDuration(0)
+        self._omr_progress.canceled.connect(self._cancel_omr)
+
+        self._omr_thread, self._omr_worker = run_omr_in_background(
+            path,
+            on_progress=self._on_omr_progress,
+            on_scores=self._on_omr_scores_ready,
+            on_failed=self._on_omr_failed,
+        )
+
+    def _cancel_omr(self):
+        if self._omr_worker is not None:
+            self._omr_worker.cancel()
+
+    def _on_omr_progress(self, current, total, message):
+        if self._omr_progress is None:
+            return
+        self._omr_progress.setMaximum(max(total, 1))
+        self._omr_progress.setValue(current)
+        self._omr_progress.setLabelText(message)
+
+    def _on_omr_scores_ready(self, scores):
+        if self._omr_progress is not None:
+            self._omr_progress.close()
+            self._omr_progress = None
+        if not scores:
+            QMessageBox.warning(self, "OMR", "No pages were recognized in that PDF.")
+            return
+
+        names = part_names(scores[0])
+        part_index = 0
+        if len(names) > 1:
+            # Required, not a nicety: jw.org piano/vocal arrangements commonly
+            # have more than one part, and silently guessing which one is the
+            # melody could punch the wrong line entirely.
+            choice, ok = QInputDialog.getItem(
+                self,
+                "Choose the melody part",
+                "This score has multiple parts - which one should become the punch strip?",
+                names,
+                0,
+                False,
+            )
+            if not ok:
+                return
+            part_index = names.index(choice)
+
+        title = os.path.splitext(os.path.basename(self._omr_pdf_path))[0]
+        tune = build_tune_from_pages(scores, part_index=part_index, title=title)
+        self.state.set_tune(tune)
+
+    def _on_omr_failed(self, message):
+        if self._omr_progress is not None:
+            self._omr_progress.close()
+            self._omr_progress = None
+        QMessageBox.critical(self, "OMR failed", message)
 
     def _refresh_preview(self):
         if self.state.music_box is None:
